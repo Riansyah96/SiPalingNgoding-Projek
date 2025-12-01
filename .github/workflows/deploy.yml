@@ -1,6 +1,7 @@
-name: SiPalingNgoding Projek Deployment
+name: SiPalingNgoding Projek CI/CD Deployment
 
 on:
+  # Pemicu: Workflow berjalan otomatis saat ada push ke branch 'main'
   push:
     branches: [ main ] 
 
@@ -11,10 +12,12 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        # 1. Mengambil kode dari repository GitHub
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
+          # Menggunakan GitHub Secrets untuk login di mesin virtual GitHub (Runner)
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
@@ -23,20 +26,34 @@ jobs:
         with:
           context: .
           push: true
+          # Membuat tag image: [DOCKER_USERNAME]/sipalingngoding-app:latest
           tags: ${{ secrets.DOCKER_USERNAME }}/sipalingngoding-app:latest 
+        # 2. Membangun image dan mendorongnya ke Docker Hub
 
-      - name: Deploy to Fedora Server via SSH
+      - name: Deploy to Server via SSH
         uses: appleboy/ssh-action@master
         with:
+          # Menggunakan Secrets untuk koneksi ke server Ubuntu (157.10.252.7)
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
+          # 3. Script yang dieksekusi di Server Ubuntu (Sequential Commands)
           script: |
-            echo "Deployment SiPalingNgoding-Projek started on Fedora Server..."
+            echo "Deployment to Ubuntu Server (157.10.252.7) started..."
+            
+            # FIX PENTING: Login ke Docker Hub di Server Ubuntu agar bisa pull image
+            docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+            
+            # Pull image terbaru dari Docker Hub
             docker pull ${{ secrets.DOCKER_USERNAME }}/sipalingngoding-app:latest
+            
+            # Hapus kontainer lama (jika ada)
             docker rm -f sipaling-kontainer || true
+            
+            # Jalankan kontainer baru: Mapping port 10000 (Host) ke 80 (Kontainer)
             docker run -d \
               -p 10000:80 \
               --name sipaling-kontainer \
               ${{ secrets.DOCKER_USERNAME }}/sipalingngoding-app:latest
-            echo "Deployment finished. Kontainer sipaling-kontainer berjalan di port 10000."
+              
+            echo "Deployment finished. Container sipaling-kontainer is running on port 10000."
